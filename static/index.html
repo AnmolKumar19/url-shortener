@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Switchboard — Link Routing</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
+<style>
+  :root {
+    --panel-bg: #17140f;
+    --panel-bg-raised: #211c16;
+    --brass: #c1863f;
+    --brass-bright: #e0a75e;
+    --cable-green: #5fa37a;
+    --cable-red: #b4544a;
+    --ivory: #f2ece0;
+    --slate: #9a8f7d;
+    --hairline: #35302a;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: radial-gradient(ellipse at top, #201a13 0%, var(--panel-bg) 55%);
+    color: var(--ivory);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    padding: 32px 20px 80px;
+  }
+
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 18px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.5rem;
+    letter-spacing: 0.02em;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  h1 .jack {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--cable-green);
+    box-shadow: 0 0 8px var(--cable-green);
+  }
+
+  .subtitle { color: var(--slate); font-size: 0.85rem; margin-top: 4px; }
+
+  #auth-status { font-family: var(--font-mono); font-size: 0.8rem; color: var(--slate); }
+  #auth-status button {
+    background: none; border: 1px solid var(--hairline); color: var(--brass-bright);
+    font-family: var(--font-mono); font-size: 0.75rem; padding: 5px 10px; border-radius: 3px;
+    cursor: pointer; margin-left: 8px;
+  }
+
+  .panel {
+    background: var(--panel-bg-raised);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 22px;
+    margin-bottom: 22px;
+  }
+
+  .panel h2 {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--slate);
+    margin: 0 0 16px 0;
+  }
+
+  label { display: block; font-size: 0.8rem; color: var(--slate); margin-bottom: 5px; }
+
+  input {
+    width: 100%;
+    background: var(--panel-bg);
+    border: 1px solid var(--hairline);
+    color: var(--ivory);
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    padding: 10px 12px;
+    border-radius: 4px;
+    margin-bottom: 14px;
+  }
+  input:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
+
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 180px; }
+
+  button.primary {
+    background: var(--brass);
+    color: #17140f;
+    border: none;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+    padding: 11px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  button.primary:hover { background: var(--brass-bright); }
+  button.primary:focus-visible { outline: 2px solid var(--ivory); outline-offset: 2px; }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  button.ghost {
+    background: none;
+    border: 1px solid var(--hairline);
+    color: var(--slate);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  button.ghost:hover { color: var(--ivory); border-color: var(--brass); }
+
+  .msg { font-family: var(--font-mono); font-size: 0.8rem; margin-top: -4px; margin-bottom: 12px; min-height: 1em; }
+  .msg.error { color: var(--cable-red); }
+  .msg.ok { color: var(--cable-green); }
+
+  /* Patch panel: each link is a "jack" row */
+  .jack-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .jack-row:last-child { border-bottom: none; }
+
+  .jack-light {
+    width: 9px; height: 9px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .jack-light.active { background: var(--cable-green); box-shadow: 0 0 6px var(--cable-green); }
+  .jack-light.inactive { background: var(--cable-red); box-shadow: 0 0 6px var(--cable-red); }
+
+  .jack-info { flex: 1; min-width: 0; }
+  .jack-code {
+    font-family: var(--font-mono); font-weight: 700; color: var(--brass-bright);
+    font-size: 0.95rem;
+  }
+  .jack-target {
+    font-size: 0.8rem; color: var(--slate);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 420px;
+  }
+  .jack-clicks {
+    font-family: var(--font-mono); font-size: 0.8rem; color: var(--ivory);
+    text-align: right; min-width: 70px;
+  }
+  .jack-clicks .n { font-weight: 700; color: var(--brass-bright); font-size: 1rem; }
+
+  .empty-state {
+    color: var(--slate); font-size: 0.85rem; font-style: italic; padding: 10px 0;
+  }
+
+  .chart-box { background: var(--panel-bg); border-radius: 4px; padding: 14px; margin-top: 10px; }
+
+  footer { text-align: center; color: var(--hairline); font-size: 0.7rem; margin-top: 40px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1><span class="jack"></span> Switchboard</h1>
+      <div class="subtitle">Route long URLs through short, trackable jacks.</div>
+    </div>
+    <div id="auth-status"></div>
+  </header>
+
+  <div class="panel" id="auth-panel">
+    <h2>Connect an operator line (optional)</h2>
+    <div class="row">
+      <div>
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="you@example.com" />
+      </div>
+      <div>
+        <label for="password">Password</label>
+        <input id="password" type="password" placeholder="••••••••" />
+      </div>
+    </div>
+    <button class="primary" id="login-btn" type="button">Log in</button>
+    <button class="ghost" id="register-btn" type="button" style="margin-left:8px;">Register</button>
+    <div class="msg" id="auth-msg"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Patch a new link</h2>
+    <label for="long-url">Destination URL</label>
+    <input id="long-url" type="url" placeholder="https://example.com/a/very/long/path" />
+    <div class="row">
+      <div>
+        <label for="alias">Custom alias (optional)</label>
+        <input id="alias" type="text" placeholder="my-link" />
+      </div>
+    </div>
+    <button class="primary" id="create-btn" type="button">Create short link</button>
+    <div class="msg" id="create-msg"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Active jacks</h2>
+    <div id="links-list"><div class="empty-state">No links yet — patch one in above.</div></div>
+  </div>
+
+  <div class="panel" id="analytics-panel" style="display:none;">
+    <h2>Traffic on <span id="analytics-code" style="color: var(--brass-bright);"></span></h2>
+    <div class="chart-box"><canvas id="clicks-chart" height="90"></canvas></div>
+    <div class="row" style="margin-top:16px;">
+      <div class="chart-box"><canvas id="device-chart" height="140"></canvas></div>
+      <div class="chart-box"><canvas id="browser-chart" height="140"></canvas></div>
+    </div>
+  </div>
+
+  <footer>Switchboard — a portfolio project. Built with FastAPI, SQLAlchemy, and Redis.</footer>
+</div>
+
+<script>
+const API = ''; // same origin
+let token = null;
+
+const $ = (id) => document.getElementById(id);
+
+function setMsg(el, text, kind) {
+  el.textContent = text;
+  el.className = 'msg' + (kind ? ' ' + kind : '');
+}
+
+function renderAuthStatus() {
+  const el = $('auth-status');
+  if (token) {
+    el.innerHTML = `Connected as operator <button id="logout-btn">Log out</button>`;
+    $('logout-btn').onclick = () => { token = null; renderAuthStatus(); };
+    $('auth-panel').style.display = 'none';
+  } else {
+    el.innerHTML = `Not connected — links you create will be anonymous`;
+    $('auth-panel').style.display = 'block';
+  }
+}
+
+async function api(path, options = {}) {
+  const headers = options.headers || {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const resp = await fetch(API + path, { ...options, headers });
+  if (!resp.ok) {
+    let detail = 'Something went wrong';
+    try { detail = (await resp.json()).detail || detail; } catch (e) {}
+    throw new Error(detail);
+  }
+  if (resp.status === 204) return null;
+  return resp.json();
+}
+
+$('register-btn').onclick = async () => {
+  const email = $('email').value, password = $('password').value;
+  try {
+    await api('/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    setMsg($('auth-msg'), 'Registered — now log in.', 'ok');
+  } catch (e) { setMsg($('auth-msg'), e.message, 'error'); }
+};
+
+$('login-btn').onclick = async () => {
+  const email = $('email').value, password = $('password').value;
+  try {
+    const form = new URLSearchParams();
+    form.set('username', email);
+    form.set('password', password);
+    const data = await api('/auth/login', { method: 'POST', body: form });
+    token = data.access_token;
+    setMsg($('auth-msg'), 'Connected.', 'ok');
+    renderAuthStatus();
+    loadLinks();
+  } catch (e) { setMsg($('auth-msg'), e.message, 'error'); }
+};
+
+$('create-btn').onclick = async () => {
+  const long_url = $('long-url').value;
+  const alias = $('alias').value.trim();
+  const payload = { long_url };
+  if (alias) payload.custom_alias = alias;
+  try {
+    await api('/links', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    setMsg($('create-msg'), 'Link patched successfully.', 'ok');
+    $('long-url').value = '';
+    $('alias').value = '';
+    loadLinks();
+  } catch (e) { setMsg($('create-msg'), e.message, 'error'); }
+};
+
+async function loadLinks() {
+  const list = $('links-list');
+  if (!token) {
+    list.innerHTML = '<div class="empty-state">Log in above to see your patched links, or create an anonymous one — it just won&rsquo;t show here.</div>';
+    return;
+  }
+  try {
+    const links = await api('/links');
+    if (links.length === 0) {
+      list.innerHTML = '<div class="empty-state">No links yet — patch one in above.</div>';
+      return;
+    }
+    list.innerHTML = links.map(l => `
+      <div class="jack-row">
+        <div class="jack-light ${l.is_active ? 'active' : 'inactive'}"></div>
+        <div class="jack-info">
+          <div class="jack-code">${l.short_code}</div>
+          <div class="jack-target">${l.long_url}</div>
+        </div>
+        <div class="jack-clicks"><span class="n">${l.total_clicks}</span><br>clicks</div>
+        <button class="ghost" data-code="${l.short_code}" onclick="showAnalytics('${l.short_code}')">View</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="empty-state">${e.message}</div>`;
+  }
+}
+
+let clicksChart, deviceChart, browserChart;
+
+async function showAnalytics(code) {
+  const data = await api(`/links/${code}/analytics`);
+  $('analytics-panel').style.display = 'block';
+  $('analytics-code').textContent = code;
+  $('analytics-panel').scrollIntoView({ behavior: 'smooth' });
+
+  const ctx1 = $('clicks-chart').getContext('2d');
+  if (clicksChart) clicksChart.destroy();
+  clicksChart = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: data.clicks_by_day.map(d => d.date),
+      datasets: [{ label: 'Clicks', data: data.clicks_by_day.map(d => d.clicks), backgroundColor: '#c1863f' }],
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+  });
+
+  const ctx2 = $('device-chart').getContext('2d');
+  if (deviceChart) deviceChart.destroy();
+  deviceChart = new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(data.device_breakdown),
+      datasets: [{ data: Object.values(data.device_breakdown), backgroundColor: ['#c1863f', '#5fa37a', '#b4544a', '#9a8f7d'] }],
+    },
+    options: { plugins: { legend: { labels: { color: '#f2ece0' } }, title: { display: true, text: 'Devices', color: '#9a8f7d' } } },
+  });
+
+  const ctx3 = $('browser-chart').getContext('2d');
+  if (browserChart) browserChart.destroy();
+  browserChart = new Chart(ctx3, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(data.browser_breakdown),
+      datasets: [{ data: Object.values(data.browser_breakdown), backgroundColor: ['#c1863f', '#5fa37a', '#b4544a', '#9a8f7d', '#e0a75e'] }],
+    },
+    options: { plugins: { legend: { labels: { color: '#f2ece0' } }, title: { display: true, text: 'Browsers', color: '#9a8f7d' } } },
+  });
+}
+
+renderAuthStatus();
+loadLinks();
+</script>
+</body>
+</html>

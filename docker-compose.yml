@@ -1,0 +1,32 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://shortener:shortener@db:5432/shortener
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-change-me}
+      - BASE_URL=http://localhost:8000
+    depends_on:
+      - db
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=shortener
+      - POSTGRES_PASSWORD=shortener
+      - POSTGRES_DB=shortener
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
