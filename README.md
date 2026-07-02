@@ -13,6 +13,12 @@ without collisions, how do you keep redirects fast at scale, what happens
 when your cache goes down. This README documents those decisions on
 purpose; that's the part worth talking about.
 
+## Live demo
+
+**https://url-shortener-id06.onrender.com/dashboard/**
+
+(Hosted on Render's free tier — the first request after a period of inactivity may take 30-60 seconds to wake up.)
+
 ## Quick start
 
 ```bash
