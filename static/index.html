@@ -313,12 +313,14 @@ $('create-btn').onclick = async () => {
   const payload = { long_url };
   if (alias) payload.custom_alias = alias;
   try {
-    await api('/links', {
+    const result = await api('/links', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    setMsg($('create-msg'), 'Link patched successfully.', 'ok');
+    const msgEl = $('create-msg');
+    msgEl.innerHTML = `Link patched: <a href="${result.short_url}" target="_blank" style="color: var(--brass-bright);">${result.short_url}</a> <button class="ghost" style="margin-left:6px; padding:2px 8px;" onclick="copyLink('${result.short_url}', this)">Copy</button>`;
+    msgEl.className = 'msg ok';
     $('long-url').value = '';
     $('alias').value = '';
     loadLinks();
@@ -341,7 +343,10 @@ async function loadLinks() {
       <div class="jack-row">
         <div class="jack-light ${l.is_active ? 'active' : 'inactive'}"></div>
         <div class="jack-info">
-          <div class="jack-code">${l.short_code}</div>
+          <div class="jack-code">
+            <a href="${l.short_url}" target="_blank" style="color: inherit; text-decoration: none;">${l.short_url}</a>
+            <button class="ghost" style="margin-left:8px; padding:2px 8px;" onclick="copyLink('${l.short_url}', this)">Copy</button>
+          </div>
           <div class="jack-target">${l.long_url}</div>
         </div>
         <div class="jack-clicks"><span class="n">${l.total_clicks}</span><br>clicks</div>
@@ -352,7 +357,13 @@ async function loadLinks() {
     list.innerHTML = `<div class="empty-state">${e.message}</div>`;
   }
 }
-
+function copyLink(url, btn) {
+  navigator.clipboard.writeText(url).then(() => {
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+}
 let clicksChart, deviceChart, browserChart;
 
 async function showAnalytics(code) {
